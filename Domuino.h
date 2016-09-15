@@ -9,6 +9,25 @@
 #define DOMUINO_H_
 
 #include <mm485.h>
+#include "settings.h"
+
+#define PAYLOAD_CODE ((t_payload<int> *)payload)->code
+#define CONFIG_DATA ((t_payload<payload_config> *)payload)->data
+#define HUB_DATA ((t_payload<payload_hub> *)payload)->data
+
+struct payload_config {
+	char parameter;
+	char value;
+};
+
+struct payload_hub {
+	char node_id;
+};
+
+struct payload_mem {
+	int memory;
+};
+
 
 struct timeout {
 	unsigned long timer;
@@ -56,7 +75,7 @@ class Domuino: public MM485 {
 public:
 	Domuino(unsigned char node_id);
 	virtual ~Domuino() {};
-	void run();
+	uint8_t run();
 	void begin();
 
 protected:
@@ -64,11 +83,8 @@ protected:
 	timeout hb_timeout;
 	int hb_enabled;
 
-	uint8_t parse_packet(unsigned char* data, Packet* pkt);
-	void update_hub(const unsigned char cmd, timeout* t);
-	void update_hub(const unsigned char cmd, int value1, timeout* t);
-	void update_hub(const unsigned char cmd, int value1, int value2, timeout* t);
-	void update_hub(const unsigned char cmd, float value1, timeout* t);
+	uint8_t parse_packet(void* payload);
+	void update_hub(void* data, uint8_t size, timeout* t);
 
 private:
 	void push_out_alive();
