@@ -8,38 +8,28 @@
 #ifndef DOMUINO_H_
 #define DOMUINO_H_
 
-#include <mm485.h>
-#include "settings.h"
+#include <domunet.h>
 
-#define PAYLOAD_CODE ((t_payload<int> *)payload)->code
-#define CONFIG_DATA ((t_payload<payload_config> *)payload)->data
-#define HUB_DATA ((t_payload<payload_hub> *)payload)->data
+#define HB_TIMING 10000UL  // milliseconds frequency for heartbeat
+#define PAYLOAD_CODE ((base_payload*)payload)->code
+#define PAYLOAD_SIZE sizeof(base_payload)
+#define CONFIG_DATA ((payload_config*)payload)
+#define HUB_DATA ((payload_hub*)payload)
+#define MAX_CHANNELS 3
+#define MAX_RETRY 3
 
-struct payload_config {
-	char parameter;
-	char value;
-};
-
-struct payload_hub {
-	char node_id;
-};
-
-struct payload_mem {
-	int memory;
-};
-
-
-struct timeout {
-	unsigned long timer;
-	unsigned long value;
-};
+// PARAMETERS AND ANSWERS HAS CODE <= 0x7f
+// QUERIES HAS CODE > 0x7f
 
 class PARAMETERS {
 public:
 	// SYSTEM
-	static const unsigned char HBT = 0x7d;
-	static const unsigned char MEM = 0x7e;
-	static const unsigned char PONG = 0x7f;
+	static const unsigned char ERR = 0x7f;
+	static const unsigned char ACK = 0x7e;
+	static const unsigned char PONG = 0x7d;
+	static const unsigned char RAM = 0x7c;
+	static const unsigned char HBT = 0x7b;
+	static const unsigned char START = 0x7a;
 	// DEVICE
 	static const unsigned char SWITCH = 0x01;
 	static const unsigned char LIGHT = 0x02;
@@ -55,6 +45,7 @@ class ANSWERS: public PARAMETERS {};
 class QUERIES {
 public:
 	// SYSTEM
+	static const unsigned char START = 0x80;
 	static const unsigned char PING = 0x81;
 	static const unsigned char RESET = 0x82;
 	static const unsigned char CONFIG = 0x88;
@@ -71,23 +62,55 @@ public:
 	static const unsigned char LUX = 0xA6;
 };
 
-class Domuino: public MM485 {
+struct timeout {
+	unsigned long timer;
+	unsigned long value;
+};
+
+struct data_channel {
+	void* data;
+	uint8_t size;
+	timeout* t;
+	uint8_t retry;
+	uint8_t sending;
+};
+
+struct payload_config : base_payload {
+	uint8_t parameter;
+	char value;
+};
+
+struct payload_hub : base_payload {
+	uint8_t node_id;
+};
+
+struct payload_mem : base_payload {
+	uint16_t memory;
+};
+
+struct payload_start : payload_hub {};
+
+class Domuino: public DomuNet {
 public:
-	Domuino(unsigned char node_id);
+	Domuino(uint8_t node_id, uint32_t baudrate);
 	virtual ~Domuino() {};
-	uint8_t run();
+	void run();
 	void begin();
 
 protected:
 	uint8_t hub_id;
 	timeout hb_timeout;
-	int hb_enabled;
+	uint8_t channel_id;
+	data_channel channels[MAX_CHANNELS];
+	base_payload hbt;
 
 	uint8_t parse_packet(void* payload);
-	void update_hub(void* data, uint8_t size, timeout* t);
+	data_channel* channel(void* data, uint8_t size, timeout* t);
+	void refresh_channel(data_channel* data);
 
 private:
-	void push_out_alive();
+	void update_hub(data_channel* data);
+//	void push_out_alive();
 };
 
 #endif /* DOMUINO_H_ */
